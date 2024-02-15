@@ -1,0 +1,1 @@
+java -cp .\src;.\config;.\lib\* rs.ac.bg.etf.pp1.Compiler %1 %2 %3

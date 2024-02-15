@@ -1,0 +1,304 @@
+package rs.ac.bg.etf.pp1;
+import java_cup.runtime.*;
+import org.apache.logging.log4j.Logger;
+import rs.ac.bg.etf.pp1.util.LoggingUtils;
+import rs.ac.bg.etf.pp1.util.SymbolUtils;
+import rs.ac.bg.etf.pp1.ast.*;
+
+parser code {:
+	Logger log = LoggingUtils.getLogger();
+
+	boolean errorDetected = false;
+	
+	public void report_error(String message, Object info) 
+    {
+		errorDetected = true;
+    	StringBuilder msg = new StringBuilder(message); 
+    	if(info instanceof Symbol)
+    	{
+            msg.append(" na liniji ");
+            msg.append(((Symbol)info).left);
+            msg.append(", koloni ");
+            msg.append(((Symbol)info).right);
+        }
+        log.error(msg.toString());
+		if(info instanceof Symbol)
+		{
+			msg = new StringBuilder();
+			msg.append("Neocekivani simbol: ");
+			msg.append(SymbolUtils.printSymbol((Symbol)info));
+			log.error(msg.toString());
+		}
+    }
+
+    public void report_fatal_error(String message, Object info) throws java.lang.Exception 
+    {
+      report_error(message, info);
+      done_parsing();
+    }
+
+    public void syntax_error(Symbol cur_token) 
+    {
+        report_error("Sintaksna greska", cur_token);
+    }
+    
+    public void unrecovered_syntax_error(Symbol cur_token) throws java.lang.Exception 
+	{
+        report_fatal_error("Fatalna greska, parsiranje se ne moze nastaviti", null);
+    }
+:}
+
+scan with {:
+	Symbol s = this.getScanner().next_token();
+	log.trace(SymbolUtils.printSymbol(s));
+	return s;
+:}
+
+terminal PROGRAM;
+terminal BREAK;
+terminal CLASS;
+terminal ELSE;
+terminal CONST;
+terminal IF;
+terminal WHILE;
+terminal NEW;
+terminal PRINT;
+terminal READ;
+terminal RETURN;
+terminal VOID;
+terminal EXTENDS;
+terminal CONTINUE;
+terminal FOREACH;
+
+terminal Integer INTLIT;
+terminal Character CHARLIT;
+terminal Boolean BOOLLIT;
+
+terminal String IDENT;
+
+terminal INC;
+terminal DEC;
+terminal EQ;
+terminal NE;
+terminal GE;
+terminal LE;
+terminal RARROW;
+terminal AND;
+terminal OR;
+terminal ADD;
+terminal SUB;
+terminal MUL;
+terminal DIV;
+terminal MOD;
+terminal GT;
+terminal LT;
+terminal ASSIGN;
+terminal SEMI;
+terminal COLON;
+terminal COMMA;
+terminal PERIOD;
+terminal LPAR;
+terminal RPAR;
+terminal LBRACK;
+terminal RBRACK;
+terminal LBRACE;
+terminal RBRACE;
+
+nonterminal java.lang.Object Program;
+nonterminal java.lang.Object ConstDecl;
+nonterminal java.lang.Object VarDecl;
+nonterminal java.lang.Object ClassDecl;
+nonterminal java.lang.Object ConstructorDecl;
+nonterminal java.lang.Object MethodDecl;
+nonterminal java.lang.Object FormPars;
+nonterminal java.lang.Object Type;
+nonterminal java.lang.Object Statement;
+nonterminal java.lang.Object DesignatorStatement;
+nonterminal java.lang.Object ActPars;
+nonterminal java.lang.Object Condition;
+nonterminal java.lang.Object CondTerm;
+nonterminal java.lang.Object CondFact;
+nonterminal java.lang.Object Expr;
+nonterminal java.lang.Object Term;
+nonterminal java.lang.Object Factor;
+nonterminal java.lang.Object Designator;
+nonterminal java.lang.Object Label;
+nonterminal java.lang.Object Assignop;
+nonterminal java.lang.Object Relop;
+nonterminal java.lang.Object Addop;
+nonterminal java.lang.Object Mulop;
+
+nonterminal java.lang.Object AnyDecls;
+nonterminal java.lang.Object AnyDecl;
+nonterminal java.lang.Object MethodDecls;
+
+nonterminal java.lang.Object ConstAssigns;
+nonterminal java.lang.Object ConstAssign;
+nonterminal java.lang.Object AnyConst;
+
+nonterminal java.lang.Object TypelessDecls;
+nonterminal java.lang.Object TypelessDecl;
+
+nonterminal java.lang.Object ClassIdent;
+nonterminal java.lang.Object VarDecls;
+nonterminal java.lang.Object ClassBody;
+nonterminal java.lang.Object ConstructorDecls;
+
+nonterminal java.lang.Object FormParsOrNone;
+nonterminal java.lang.Object Statements;
+
+nonterminal java.lang.Object ReturnType;
+
+nonterminal java.lang.Object FormPar;
+
+nonterminal java.lang.Object ActParsOrNone;
+nonterminal java.lang.Object Designators;
+nonterminal java.lang.Object DesignatorOrNone;
+
+nonterminal java.lang.Object Terms;
+
+nonterminal java.lang.Object VarDecl2;
+nonterminal java.lang.Object TypelessDecls2;
+
+precedence left ELSE;
+
+Program 			::= (CompleteProgram) 					PROGRAM IDENT AnyDecls LBRACE MethodDecls RBRACE;
+AnyDecls 			::= (ProgramDeclarationList) 			AnyDecl AnyDecls 																/*{ConstDecl | VarDecl | ClassDecl}*/
+					  | (ProgramDeclarationEpsilon)			;
+AnyDecl 			::= (ProgramConstDeclaration)			ConstDecl 																		/*ConstDecl | VarDecl | ClassDecl*/
+					  | (ProgramVarDeclaration) 			VarDecl
+					  | (ProgramClassDeclaration)			ClassDecl;
+MethodDecls			::= (ProgramMethodDeclarationList) 		MethodDecl MethodDecls															/*{MethodDecl}*/ 
+					  | (ProgramMethodDeclarationEpsilon)	;
+	            	
+ConstDecl 			::= (ConstDeclaration)					CONST Type ConstAssigns SEMI;
+ConstAssigns 		::= (ConstAssignmentSingle) 			ConstAssign 																	/*ident "=" (numConst | charConst | boolConst) {, ident "=" (numConst | charConst | boolConst)}*/
+					  | (ConstAssignmentList) 				ConstAssign COMMA ConstAssigns
+  					  | (ErrorInConstDeclaration2)          error 																			{:parser.report_error("Izvrsen oporavak od greske pri deklaraciji konstante do ','", null);:} COMMA ConstAssigns
+  					  | (ErrorInConstDeclaration3)          error 																			{:parser.report_error("Izvrsen oporavak od greske pri deklaraciji konstante do ';'", null);:};
+ConstAssign 		::= (ConstAssignment) 					IDENT ASSIGN AnyConst; 															/*ident "=" (numConst | charConst | boolConst)*/
+AnyConst 			::= (IntConst) 							INTLIT																			/*numConst | charConst | boolConst*/
+					  | (CharConst)							CHARLIT
+					  | (BoolConst)							BOOLLIT;
+	            	
+VarDecl 			::= (VarDeclaration) 					Type TypelessDecls SEMI;
+VarDecl2 			::= (VarDeclaration2) 					Type TypelessDecls2 SEMI
+					  | (ErrorInVarDeclaration4)			error																			{:parser.report_error("Izvrsen oporavak od greske pri deklaraciji polja do ';'", null);:} SEMI
+					  | (ErrorInVarDeclaration5)			error																			{:parser.report_error("Izvrsen oporavak od greske pri deklaraciji polja do '{;'", null);:};
+TypelessDecls 		::= (TypelessDeclarationSingle) 		TypelessDecl																	/*ident ["[" "]"] {"," ident ["[" "]"]}*/
+					  | (TypelessDeclarationList) 			TypelessDecl COMMA TypelessDecls
+					  | (ErrorInVarDeclaration2)			error 																			{:parser.report_error("Izvrsen oporavak od greske pri deklaraciji promenljive do ','", null);:} COMMA TypelessDecls
+					  | (ErrorInVarDeclaration3)			error 																			{:parser.report_error("Izvrsen oporavak od greske pri deklaraciji promenljive do ';'", null);:};
+TypelessDecls2 		::= (TypelessDeclarationSingle2) 		TypelessDecl																	/*ident ["[" "]"] {"," ident ["[" "]"]}*/
+					  | (TypelessDeclarationList2) 			TypelessDecl COMMA TypelessDecls2;
+TypelessDecl 		::= (TypelessVarDeclaration) 			IDENT																			/*ident ["[" "]"]*/
+					  | (TypelessArrayDeclaration) 			IDENT LBRACK RBRACK;
+	            	
+ClassDecl 			::= (ClassDeclaration)					CLASS ClassIdent LBRACE VarDecls ClassBody RBRACE;
+ClassIdent 			::= (BaseClass) 						IDENT																			/*ident ["extends" Type]*/
+					  | (DerivedClass) 						IDENT EXTENDS Type
+					  | (ErrorInClassIdentifier)			error																			{:parser.report_error("Izvrsen oporavak od greske pri deklaraciji prosirenja natklase do '{'", null);:};
+VarDecls 			::= (VarDeclarationList)				VarDecl2 VarDecls																/*{VarDecl}*/
+					  | (VarDeclarationEpsilon)				;
+ClassBody 			::= (ClassBodyList)						LBRACE ConstructorDecls MethodDecls RBRACE 										/*["{" {ConstructorDecl} {MethodDecl} "}"]*/
+					  | (ClassBodyEpsilon)					;
+ConstructorDecls	::= (ConstructorDeclarationList)		ConstructorDecls ConstructorDecl												/*{ConstructorDecl}*/
+					  | (ConstructorDeclarationEpsilon)		;
+
+ConstructorDecl 	::= (ConstructorDeclaration)			IDENT LPAR FormParsOrNone RPAR VarDecls LBRACE Statements RBRACE;
+FormParsOrNone 		::= (HasFormalParameters) 				FormPars																		/*[FormPars]*/
+					  | (HasNoFormalParameters)				;
+Statements 			::= (HasStatements)						Statement Statements															/*{Statement}*/
+					  | (HasNoStatements)					;
+					  
+MethodDecl 			::= (MethodDeclaration) 				ReturnType IDENT LPAR FormParsOrNone RPAR VarDecls LBRACE Statements RBRACE;
+ReturnType 			::= (ReturnNonVoid) 					Type																			/*Type | "void"*/
+					  | (ReturnVoid) 						VOID;
+
+FormPars 			::= (FormalParameterSingle)				FormPar
+					  | (FormalParameterList)				FormPar COMMA FormPars
+					  | (ErrorInFormalParameters)			error 																			{:parser.report_error("Izvrsen oporavak od greske pri deklaraciji formalnog parametra do ')'", null);:}
+					  | (ErrorInFormalParameters2)			error 																			{:parser.report_error("Izvrsen oporavak od greske pri deklaraciji formalnog parametra do ','", null);:} COMMA FormPars;
+FormPar 			::= (FormalParameter)					Type TypelessDecl;																/*Type ident ["[" "]"]*/
+
+Type 				::= (Type) 								IDENT;
+
+Statement 			::=	(DesignatorStmt) 					DesignatorStatement SEMI
+					  |	(IfStmt) 							IF LPAR Condition RPAR Statement
+					  |	(IfElseStmt) 						IF LPAR Condition RPAR Statement ELSE Statement
+					  |	(WhileStmt) 						WHILE LPAR Condition RPAR Statement
+					  |	(BreakStmt) 						BREAK SEMI
+					  |	(ContinueStmt) 						CONTINUE SEMI
+					  |	(ReturnExprStmt) 					RETURN Expr SEMI
+					  |	(ReturnVoidStmt) 					RETURN SEMI
+					  |	(ReadStmt) 							READ LPAR Designator RPAR SEMI
+					  |	(PrintExprStmt) 					PRINT LPAR Expr RPAR SEMI
+					  |	(PrintExprConstStmt) 				PRINT LPAR Expr COMMA INTLIT RPAR SEMI
+					  |	(ForeachStmt) 						Designator PERIOD FOREACH LPAR IDENT RARROW Statement RPAR SEMI
+					  |	(BlockStmt) 						LBRACE Statements RBRACE;
+
+DesignatorStatement	::=	(Assignment) 						Designator Assignop Expr
+					  | (FunctionCall) 						Designator LPAR ActParsOrNone RPAR
+					  | (PostIncrement) 					Designator INC
+					  | (PostDecrement)						Designator DEC
+					  | (CompoundAssignment) 				LBRACK Designators RBRACK Assignop Designator
+					  | (ErrorInDesignatorStatement)		error																			{:parser.report_error("Izvrsen oporavak od greske u iskazu do ';'", null);:};
+
+ActParsOrNone 		::= (HasActualParameters)				ActPars																			/*[ActPars]*/
+					  | (HasNoActualParameters)				;
+
+Designators 		::= (DesignatorSingle) 					DesignatorOrNone																/*[Designator] {"," [Designator]}*/
+					  | (DesignatorList)					DesignatorOrNone COMMA Designators;
+
+DesignatorOrNone 	::= (DesignatorActual) 					Designator																		/*[Designator]*/
+					  | (DesignatorEpsilon)					;
+
+ActPars 			::= (ActualParameterSingle)				Expr
+					  | (ActualParameterList)				Expr COMMA ActPars;
+
+Condition 			::= (SimpleCondition)					CondTerm
+					  | (ComplexCondition)					CondTerm OR Condition
+					  | (ErrorInCondition)					error																			{:parser.report_error("Izvrsen oporavak od greske u logickom izrazu do ')'", null);:};
+					  
+CondTerm			::= (SimpleConditionTerm)				CondFact
+					  | (ComplexConditionTerm)				CondFact AND CondTerm;
+
+CondFact 			::= (ExpressionConditionFact)			Expr
+					  | (RelopConditionFact) 				Expr Relop Expr;
+
+Expr 				::= (SimpleExpression)					Terms																			/*Term {Addop Term}*/
+					  | (ComplexExpression)					Expr Addop Terms;
+Terms 				::= (NegativeExpression)				SUB Term
+					  | (PositiveExpression)				Term;
+
+Term 				::= (SimpleTerm)						Factor
+					  | (ComplexTerm) 						Term Mulop Factor;
+
+Factor 				::=	(Variable)							Designator
+					  |	(FunctionCallInExpression)			Designator LPAR ActParsOrNone RPAR
+					  |	(Literal)							AnyConst
+					  |	(NewArray)							NEW Type LBRACK Expr RBRACK
+					  |	(NewObject)							NEW Type LPAR ActParsOrNone RPAR
+					  |	(ExpressionInParentheses)			LPAR Expr RPAR;
+
+Designator 			::= (VarDesignator) 					IDENT
+					  | (FieldDesignator) 					Designator PERIOD IDENT
+					  | (ArrayDesignator) 					Designator LBRACK Expr RBRACK;
+
+Label 				::= (Label)								IDENT;
+
+Assignop 			::= (Assign)							ASSIGN;
+
+Relop 				::= (Equal) 							EQ
+					  | (NotEqual)							NE
+					  | (Greater)							GT
+					  | (GreaterEqual)						GE
+					  | (Less)								LT
+					  | (LessEqual)							LE;
+
+Addop 				::= (Add) 								ADD
+					  | (Sub)								SUB;
+
+Mulop 				::= (Mul)								MUL
+					  | (Div)								DIV
+					  | (Mod)								MOD;

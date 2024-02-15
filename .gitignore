@@ -1,0 +1,14 @@
+MJParser.java
+sym.java
+Yylex.java
+**/ast/*
+
+*.class
+
+*.in
+*.out
+*.cout
+*.err
+*.cerr
+*.log
+*.obj
